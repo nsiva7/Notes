@@ -1,6 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Toolbar } from './Toolbar';
-import { exportToImage, exportToPDF, htmlToMarkdown, markdownToHtml } from '../utils/exportUtils';
 
 interface RichTextEditorProps {
   value: string;
@@ -108,7 +107,19 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
           if (file.name.endsWith('.html')) {
             editorRef.current.innerHTML = content;
           } else if (file.name.endsWith('.md')) {
-            const htmlContent = markdownToHtml(content);
+            // Basic Markdown to HTML conversion
+            const htmlContent = content
+              .replace(/^### (.*$)/gm, '<h3>$1</h3>')
+              .replace(/^## (.*$)/gm, '<h2>$1</h2>')
+              .replace(/^# (.*$)/gm, '<h1>$1</h1>')
+              .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+              .replace(/\*(.*?)\*/g, '<em>$1</em>')
+              .replace(/_(.*?)_/g, '<u>$1</u>')
+              .replace(/^> (.*$)/gm, '<blockquote>$1</blockquote>')
+              .replace(/^\- (.*$)/gm, '<li>$1</li>')
+              .replace(/^(\d+)\. (.*$)/gm, '<li>$1</li>')
+              .replace(/!\[([^\]]*)\]\(([^)]*)\)/g, '<img src="$2" alt="$1">')
+              .replace(/\n/g, '<br>');
             editorRef.current.innerHTML = htmlContent;
           } else {
             // Plain text
@@ -163,20 +174,84 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
         break;
       
       case 'md':
+        // Basic HTML to Markdown conversion
         const htmlContent = editorRef.current.innerHTML;
-        content = htmlToMarkdown(htmlContent);
+        content = htmlContent
+          .replace(/<h1[^>]*>(.*?)<\/h1>/gi, '# $1\n\n')
+          .replace(/<h2[^>]*>(.*?)<\/h2>/gi, '## $1\n\n')
+          .replace(/<h3[^>]*>(.*?)<\/h3>/gi, '### $1\n\n')
+          .replace(/<strong[^>]*>(.*?)<\/strong>/gi, '**$1**')
+          .replace(/<em[^>]*>(.*?)<\/em>/gi, '*$1*')
+          .replace(/<u[^>]*>(.*?)<\/u>/gi, '_$1_')
+          .replace(/<blockquote[^>]*>(.*?)<\/blockquote>/gi, '> $1\n\n')
+          .replace(/<ul[^>]*>(.*?)<\/ul>/gis, (match, content) => {
+            return content.replace(/<li[^>]*>(.*?)<\/li>/gi, '- $1\n') + '\n';
+          })
+          .replace(/<ol[^>]*>(.*?)<\/ol>/gis, (match, content) => {
+            let counter = 1;
+            return content.replace(/<li[^>]*>(.*?)<\/li>/gi, () => `${counter++}. $1\n`) + '\n';
+          })
+          .replace(/<br[^>]*>/gi, '\n')
+          .replace(/<p[^>]*>(.*?)<\/p>/gi, '$1\n\n')
+          .replace(/<img[^>]*src="([^"]*)*"[^>]*>/gi, '![Image]($1)')
+          .replace(/<[^>]*>/g, '') // Remove remaining HTML tags
+          .replace(/\n{3,}/g, '\n\n') // Clean up multiple newlines
+          .trim();
         filename = `${noteTitle}.md`;
         mimeType = 'text/markdown';
         break;
       
       case 'image':
-        if (editorRef.current) {
-          await exportToImage(editorRef.current, `${noteTitle}.png`);
+        // Use browser's built-in print functionality
+        const printWindow = window.open('', '_blank');
+        if (printWindow && editorRef.current) {
+          printWindow.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <title>${noteTitle}</title>
+              <style>
+                body { font-family: Arial, sans-serif; padding: 20px; background: white; }
+                img { max-width: 100%; height: auto; }
+              </style>
+            </head>
+            <body>
+              <h1>${noteTitle}</h1>
+              ${editorRef.current.innerHTML}
+            </body>
+            </html>
+          `);
+          printWindow.document.close();
+          printWindow.focus();
+          printWindow.print();
         }
         return;
       
       case 'pdf':
-        exportToPDF(editorRef.current?.innerHTML || '', noteTitle, `${noteTitle}.pdf`);
+        // Use browser's built-in print to PDF functionality
+        const pdfWindow = window.open('', '_blank');
+        if (pdfWindow && editorRef.current) {
+          pdfWindow.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <title>${noteTitle}</title>
+              <style>
+                body { font-family: Arial, sans-serif; padding: 20px; background: white; }
+                img { max-width: 100%; height: auto; }
+                @media print { body { margin: 0; } }
+              </style>
+            </head>
+            <body>
+              <h1>${noteTitle}</h1>
+              ${editorRef.current.innerHTML}
+            </body>
+            </html>
+          `);
+          pdfWindow.document.close();
+          pdfWindow.focus();
+          pdfWindow.print();
+        }
         return;
     }
 
