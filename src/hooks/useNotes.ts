@@ -51,11 +51,13 @@ export const useNotes = () => {
       id: Date.now().toString(),
       title: 'Untitled Note',
       content: '',
+      htmlContent: '',
       category: categories[0].id,
       tags: [],
       createdAt: new Date(),
       updatedAt: new Date(),
       color: categories[0].color,
+      attachments: [],
     };
     
     setNotes(prev => [newNote, ...prev]);

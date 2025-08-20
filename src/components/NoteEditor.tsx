@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Save, Trash2, Download, Tag, Calendar, FileText } from 'lucide-react';
 import { Note, Category } from '../types/Note';
+import { RichTextEditor } from './RichTextEditor';
 
 interface NoteEditorProps {
   note: Note | null;
@@ -17,6 +18,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
 }) => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [htmlContent, setHtmlContent] = useState('');
   const [category, setCategory] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
@@ -26,6 +28,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
     if (note) {
       setTitle(note.title);
       setContent(note.content);
+      setHtmlContent(note.htmlContent || '');
       setCategory(note.category);
       setTags(note.tags);
       setHasChanges(false);
@@ -36,6 +39,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
     if (note && (
       title !== note.title ||
       content !== note.content ||
+      htmlContent !== (note.htmlContent || '') ||
       category !== note.category ||
       JSON.stringify(tags) !== JSON.stringify(note.tags)
     )) {
@@ -43,11 +47,11 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
     } else {
       setHasChanges(false);
     }
-  }, [note, title, content, category, tags]);
+  }, [note, title, content, htmlContent, category, tags]);
 
   const handleSave = () => {
     if (note && hasChanges) {
-      onUpdateNote(note.id, { title, content, category, tags });
+      onUpdateNote(note.id, { title, content, htmlContent, category, tags });
       setHasChanges(false);
     }
   };
@@ -69,13 +73,29 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
   const handleDownload = () => {
     if (!note) return;
     
-    const blob = new Blob([`${note.title}\n\n${note.content}`], {
-      type: 'text/plain',
+    // Create HTML export with rich content
+    const htmlExport = `<!DOCTYPE html>
+<html>
+<head>
+  <title>${note.title}</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+    img { max-width: 100%; height: auto; }
+  </style>
+</head>
+<body>
+  <h1>${note.title}</h1>
+  ${htmlContent || note.content}
+</body>
+</html>`;
+    
+    const blob = new Blob([htmlExport], {
+      type: 'text/html',
     });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${note.title}.txt`;
+    a.download = `${note.title}.html`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -99,7 +119,12 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
     }, 1000);
 
     return () => clearTimeout(timeoutId);
-  }, [hasChanges, title, content, category, tags]);
+  }, [hasChanges, title, content, htmlContent, category, tags]);
+
+  const handleContentChange = (textContent: string, htmlValue: string) => {
+    setContent(textContent);
+    setHtmlContent(htmlValue);
+  };
 
   if (!note) {
     return (
@@ -211,14 +236,11 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
       </div>
 
       {/* Content */}
-      <div className="flex-1 p-4">
-        <textarea
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          className="w-full h-full border-none outline-none resize-none text-gray-900 leading-relaxed placeholder-gray-400"
-          placeholder="Start writing your note..."
-        />
-      </div>
+      <RichTextEditor
+        value={content}
+        onChange={handleContentChange}
+        placeholder="Start writing your note..."
+      />
     </div>
   );
 };
